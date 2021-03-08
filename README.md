@@ -23,4 +23,4 @@ https://doi.org/10.1016/j.neucom.2020.03.064
 
 # Requirment
 
-This code is tested on Python 3.5.4 |Continuum Analytics, Inc.| (default, Aug 14 2017, 13:41:13) [MSC v.1900 64 bit (AMD64)]. It impalement CNN by Keras Using TensorFlow backend.
+This code is tested on Python 3.5.4 |Continuum Analytics, Inc.| (default, Aug 14 2017, 13:41:13) [MSC v.1900 64 bit (AMD64)]. It implements CNN by Keras Using TensorFlow backend.
