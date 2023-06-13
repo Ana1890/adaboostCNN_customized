@@ -11,8 +11,13 @@ import numpy
 seed = 50
 numpy.random.seed(seed)
 #TensorFlow has its own random number generator
-from tensorflow import set_random_seed
-set_random_seed(seed)
+# from tensorflow import set_random_seed
+# set_random_seed(seed)
+import tensorflow as tf
+
+tf.random.set_seed(
+    seed
+)
 ####################
 import pandas as pd
 import matplotlib.pyplot as plt
