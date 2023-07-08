@@ -5,6 +5,7 @@ from copy import deepcopy
 ##kerase & CNN:
 #from keras import models as Models
 from keras.models import Sequential
+import tensorflow as tf
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 
@@ -82,7 +83,7 @@ class AdaBoostClassifier(object):
                 '''AdaBoostClassifier can only be called with keyword
                    arguments for the following keywords: base_estimator ,n_estimators,
                     learning_rate,algorithm,random_state''')
-        allowed_keys = ['base_estimator', 'n_estimators', 'learning_rate', 'algorithm', 'random_state', 'epochs']
+        allowed_keys = ['base_estimator', 'n_estimators', 'learning_rate', 'algorithm', 'random_state', 'epochs', 'sample_size']
         keywords_used = kwargs.keys()
         for keyword in keywords_used:
             if keyword not in allowed_keys:
@@ -104,6 +105,8 @@ class AdaBoostClassifier(object):
             if 'learning_rate' in kwargs: learning_rate = kwargs.pop('learning_rate')
             if 'algorithm' in kwargs: algorithm = kwargs.pop('algorithm')
             if 'random_state' in kwargs: random_state = kwargs.pop('random_state')
+            if 'sample_size' in kwargs: sample_size = kwargs.pop('sample_size')
+
             ### CNN:
             if 'epochs' in kwargs: epochs = kwargs.pop('epochs')
 
@@ -112,98 +115,99 @@ class AdaBoostClassifier(object):
         self.n_estimators_ = n_estimators
         self.learning_rate_ = learning_rate
         self.algorithm_ = algorithm
+        self.sample_size = sample_size
         self.random_state_ = random_state
         self.estimators_ = list()
-        self.estimator_weights_ = np.zeros(self.n_estimators_)
-        self.estimator_metrics_ = np.ones(self.n_estimators_)
+        self.n_batch = 0
+        
         
         #self.config = config
         self.epochs= epochs
 
 
-    def fit(self, training_generator, valid_generator, class_weights):
+    def fit(self, training_generator):
+        self.batch_size = len(training_generator[0])
         
-        for iboost in range(self.n_estimators_):
-            print("Entrenamiento del estimator nro {0}".format(iboost))
-            if iboost == 0:
-                class_weights = class_weights
+        # for iboost in range(self.n_estimators_):
+        for epoch in range(self.epochs):
+            print("Entrenamiento de la epoch nro {0}".format(epoch))
+            
+            for iboost in range(len(training_generator)):
+                print("Entrenamiento del batch nro {0}".format(iboost))                
+                sample_weights = np.ones(self.batch_size) / self.batch_size
+                
+                
+                sample_weights = self.boost(training_generator, sample_weights)
 
-            class_weights, estimator_weight, estimator_metric = self.boost(training_generator, valid_generator, class_weights)
-
-            # append error and weight
-            self.estimator_metrics_[iboost] = estimator_metric
-            self.estimator_weights_[iboost] = estimator_weight
-
+                self.n_batch += 1
+            self.n_batch = 0
+            
         return self
 
 
-    def boost(self, training_generator, valid_generator, class_weights):
+    def boost(self, training_generator, sample_weights):
         if self.algorithm_ == 'SAMME':
-            return self.discrete_boost(training_generator, valid_generator, class_weights)
+            return self.discrete_boost(training_generator, sample_weights)
         elif self.algorithm_ == 'SAMME.R':
-            return self.real_boost(training_generator, valid_generator, class_weights)
+            return self.real_boost(training_generator,sample_weights)
     
             
-    def real_boost(self, training_generator, valid_generator, class_weights):
+    def real_boost(self, training_generator, sample_weights):
         # estimator = deepcopy(self.base_estimator_)
 
         if len(self.estimators_) == 0:
-            # Copy CNN to estimator:
-            estimator = self.deepcopy_CNN(self.base_estimator_) # deepcopy of self.base_estimator_ # Agarra los pesos del modelo actual
+            if self.n_batch==0:
+                # Copy CNN to estimator:
+                self.estimator = self.deepcopy_CNN(self.base_estimator_) # deepcopy of self.base_estimator_ # Agarra los pesos del modelo actual
         else: 
-            estimator = self.deepcopy_CNN(self.estimators_[-1]) # deepcopy CNN # Agarra los pesos del anterior modelo
+            if self.n_batch==0:
+                self.estimator = self.deepcopy_CNN(self.estimators_[-1]) # deepcopy CNN # Agarra los pesos del anterior modelo
         if self.random_state_:
-                estimator.set_params(random_state=1)
+                self.estimator.set_params(random_state=1)
+                
+        X,y = training_generator[self.n_batch]
         
-        # # CNN (3) binery label:       
-        # lb=LabelBinarizer()
-        # y_b = lb.fit_transform(y)
+        # CNN (3) binery label:       
+        lb=LabelBinarizer()
+        y_b = lb.fit_transform(y)
         
+        print("Estimator nro: ", len(self.estimators_))
+
+        if len(self.estimators_)>=1:
+            y_pred = self.estimator.predict(X)
+            y_pred_l = np.where(y_pred>0.5,1,0)
+            incorrect = y_pred_l != y_b
+            
+            print("old sample_weights: ", sample_weights)
+            sample_weights = sample_weights*np.exp(-1. * self.learning_rate_ * (((2 - 1) / 2) *
+                                                            inner1d(y_b, np.log(
+                                                                y_pred)))) 
+
+            sample_weight_sum = np.sum(sample_weights, axis=0)
+            
+
+            # if sample_weight_sum <= 0:
+            #     return None, None, None
+
+            # normalize sample weight
+            sample_weights /= sample_weight_sum
+        else: 
+            sample_weights = np.ones(self.batch_size) / self.batch_size
+        
+            
+
         #with tf.GradientTape() as tape:
-        hist = estimator.fit_generator(generator= training_generator, epochs = self.epochs, 
-                             validation_data=valid_generator, callbacks=callbacks)#, class_weight=class_weights)
-        
-        min_val_loss = hist.history['val_loss']
-        min_val_loss = min(min_val_loss)
-        
-        f1_score = hist.history['get_f1_score'][int(min_val_loss)]
-        estimator_metric = f1_score
-        
-        # y_pred = estimator.predict(X)
-        # y_pred_l = np.where(y_pred>0.5,1,0)
-        # incorrect = y_pred_l != y_b
-        
-        # print("y_pred: \n", y_pred, "y_true: \n", y_b)
-        # print("incorrect: \n", incorrect, " Sample weight: \n", sample_weight)
-        
-        #estimator_error = np.dot(incorrect.reshape(1,-1), sample_weight) / np.sum(sample_weight, axis=0)
-
-        # print("estimator_error: ", estimator_error)
-        # # if worse than random guess, stop boosting
-        # if estimator_error >= 1.0 - 1 / self.n_classes_:
-        #     return None, None, None
-
-        # sample_weight = sample_weight*np.exp(-1. * self.learning_rate_ * (((2 - 1) / 2) *
-        #                                                 inner1d(y_b, np.log(
-        #                                                     y_pred)))) 
-        for k,v in class_weights.items():
-            class_weights[k] = v*np.exp(-1. * self.learning_rate_ * (((2 - 1) / 2) *
-                                                        f1_score))
-
-        class_weights_sum = np.sum(list(class_weights.values()),axis=0)
-        
-
-        if class_weights_sum <= 0:
-            return None, None, None
-
-        # normalize sample weight
-        for k,v in class_weights.items():
-            class_weights[k] = v/class_weights_sum
+        print('New sample_weights: ', sample_weights)
+        hist = self.estimator.fit(X,y,sample_weight=sample_weights, epochs = 1)
 
         # append the estimator
-        self.estimators_.append(estimator) 
+        if self.n_batch >= int(self.sample_size/self.batch_size)-1:
+            print("Nuevo estimator..")
+            self.estimators_.append(self.estimator) 
+            
+        
 
-        return class_weights, 1, estimator_metric
+        return sample_weights, 1
     
     
     def deepcopy_CNN(self, base_estimator0):
@@ -217,54 +221,4 @@ class AdaBoostClassifier(object):
 
         return estimator 
 
-    def discrete_boost(self, X, y, sample_weight):
-    # estimator = deepcopy(self.base_estimator_)
-           
-        if len(self.estimators_) == 0:
-            #Copy CNN to estimator:
-            estimator = self.deepcopy_CNN(self.base_estimator_) # deepcopy of self.base_estimator_
-        else: 
-            estimator = self.deepcopy_CNN(self.estimators_[-1]) # deepcopy CNN
-        
-        if self.random_state_:
-            estimator.set_params(random_state=1)
-
-#        estimator.fit(X, y, sample_weight=sample_weight)
-        # CNN (3) binery label:       
-        lb=LabelBinarizer()
-        y_b = lb.fit_transform(y)
-        estimator.fit(X, y_b, sample_weight=sample_weight, epochs = self.epochs, batch_size = self.batch_size)
-        y_pred = estimator.predict(X)
-        
-        #incorrect = y_pred != y
-        # (4) CNN :
-        y_pred_l = np.argmax(y_pred, axis=1)
-        incorrect = y_pred_l != y
-        estimator_error = np.dot(incorrect, sample_weight) / np.sum(sample_weight, axis=0)
-
-        # if worse than random guess, stop boosting
-        if estimator_error >= 1 - 1 / self.n_classes_:
-            return None, None, None
-
-        # update estimator_weight
-        estimator_weight = self.learning_rate_ * (np.log((1. - estimator_error) / estimator_error) + np.log(self.n_classes_ - 1.))
-
-        if estimator_weight <= 0:
-            return None, None, None
-
-        # update sample weight
-        sample_weight *= np.exp(estimator_weight * incorrect)
-
-        sample_weight_sum = np.sum(sample_weight, axis=0)
-        if sample_weight_sum <= 0:
-            return None, None, None
-
-        # normalize sample weight
-        sample_weight /= sample_weight_sum
-
-        # append the estimator
-        self.estimators_.append(estimator)
-
-        return sample_weight, estimator_weight, estimator_error
-
-
+    
