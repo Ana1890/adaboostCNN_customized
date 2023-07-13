@@ -153,7 +153,7 @@ class AdaBoostClassifier(object):
         self.estimators_ = list()
         self.optimizer = tf.keras.optimizers.Adam(params['lr'])
         self.n_batch = 0
-        
+
         self.train_acc_metric = tf.keras.metrics.BinaryAccuracy(threshold=0.5)
         self.train_loss_metric = tf.keras.metrics.BinaryCrossentropy()
         self.val_acc_metric = tf.keras.metrics.BinaryAccuracy(threshold=0.5)
@@ -161,7 +161,7 @@ class AdaBoostClassifier(object):
 
         self.patience = 2
         self.wait = 0
-        self.best = 0
+        self.best = 100
         self.list_save = list()
   
         
@@ -173,7 +173,7 @@ class AdaBoostClassifier(object):
         y = tf.constant(y)
         with tf.GradientTape() as tape:
             logits = self.estimator(x, training=True)
-            # print("label y pred: ", y, logits)
+            print("label y pred: ", y, logits)
             loss_value = loss_fn(y, logits, sample_weight=sample_weight)
             # print('pérdida: ', loss_value)
         grads = tape.gradient(loss_value, self.estimator.trainable_weights)
@@ -196,7 +196,7 @@ class AdaBoostClassifier(object):
             print("\nEntrenamiento de la epoch nro {0}".format(epoch))
             
             for i in range(len(training_generator)):
-                # print("\nEntrenamiento del batch nro {0}".format(i))                
+                print("\nEntrenamiento del batch nro {0}".format(i))                
                 sample_weights = np.ones(self.batch_size)
                 
                 
@@ -224,15 +224,17 @@ class AdaBoostClassifier(object):
             self.val_loss_metric.reset_states()
             
             self.wait += 1
-            if val_loss > self.best:
+            # if val_loss > self.best:
+            if val_loss < self.best:
                 self.best = val_loss
                 self.wait = 0
-                self.list_save = list()
-            else:
-                self.list_save.append(self.estimator)
-                
+                # self.list_save = list()
+                tf.keras.models.save_model(self.estimator, 'best_model.h5', save_format='h5')
+            # else:
+            #     self.best = val_loss               
             if self.wait >= self.patience:
-                tf.keras.models.save_model(self.list_save[0], 'best_model.h5', save_format='h5')
+                
+                print("Early stopping and saving checkpoint..")
                 break
             
             
@@ -272,11 +274,11 @@ class AdaBoostClassifier(object):
         #print("Estimator nro: ", len(self.estimators_))
 
         if len(self.estimators_)>=1:
-            y_pred = self.estimator.predict(X)
+            y_pred = self.estimator.predict(X, verbose=0)
             y_pred_l = np.where(y_pred>0.5,1,0)
             incorrect = y_pred_l != y_b
             
-            #print("old sample_weights: ", sample_weights)
+            print("old sample_weights: ", sample_weights)
             sample_weights = sample_weights*np.exp(-1. * self.learning_rate_ * (((2 - 1) / 2) *
                                                             inner1d(y_b, np.log(
                                                                 y_pred)))) 
@@ -295,7 +297,7 @@ class AdaBoostClassifier(object):
             
 
         #with tf.GradientTape() as tape:
-        #print('New sample_weights: ', sample_weights)
+        print('New sample_weights: ', sample_weights)
         # hist = self.estimator.fit(X,y,sample_weight=sample_weights, epochs = 1)
 
         loss_value = self.train_step(X, y, sample_weights)
@@ -321,12 +323,16 @@ class AdaBoostClassifier(object):
 
         weights = base_estimator0.get_weights()
         estimator.set_weights(weights) # Le atribuye al estimator los pesos de inicialización por defoult o los pesos del modelo anterior
-        # estimator.compile(loss=params['loss'], optimizer=params['optimizer'], metrics=[params['metrics'], get_recall, get_f1_score, get_precision])
+        estimator.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True), optimizer=tf.keras.optimizers.Adam(params['lr']), 
+                          metrics=tf.keras.metrics.BinaryAccuracy(threshold=0.5)) #AGREGARLO
 
         return estimator 
 
     
 
+
+
+        
 
 
 
