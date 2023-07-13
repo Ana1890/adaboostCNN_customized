@@ -3,7 +3,6 @@ from datetime import datetime
 
 
 ### CONSTANTS
-
 fecha_actual = datetime.now()
 str_date = fecha_actual.strftime('%Y.%m.%d')
 specific_time = fecha_actual.strftime('%Y.%m.%d %H.%M')
@@ -11,20 +10,21 @@ specific_time = fecha_actual.strftime('%Y.%m.%d %H.%M')
 ### PATHS
 
 # Kaggle
-train_path = '//lxestudios/pacs/Eye/EyePacs/diabetic-retinopathy-detection/train/'
-test_path = '//lxestudios/pacs/Eye/EyePacs/diabetic-retinopathy-detection/test/'
+train_path = '/mnt/lxestudios/pacs/Eye/EyePacs/diabetic-retinopathy-detection/train/'
+test_path = '/mnt/lxestudios/pacs/Eye/EyePacs/diabetic-retinopathy-detection/test/'
 
 # labels
-root_path = 'C:/Users/UsuarioHI/Untitled Folder/'
+# root_path = 'C:/Users/UsuarioHI/Untitled Folder/'
+root_path = '/mnt/lxestudios/pacs/Eye/EyePacs/diabetic-retinopathy-detection/'
 
 # load model segmentation
-root_model = '//lxestudios/pacs/Eye/Modelo Segmentacion/'
+root_model = '/mnt/lxestudios/pacs/Eye/Modelo Segmentacion/'
 
 # Load segmented images
-root_masks = '//lxestudios/pacs/Eye/pre-proc-eyepacs-propuesto/all_segmentacion/'
+root_masks = '/mnt/lxestudios/pacs/Eye/pre-proc-eyepacs-propuesto/all_segmentacion/'
 
 # save model 
-models_path = '//lxestudios/pacs/Eye/Modelos/Modelos_retinopatia/Modelo_Binario/'
+models_path = '/mnt/lxestudios/pacs/Eye/Modelos/Modelos_retinopatia/Modelo_Binario/'
 
 #### DICT
 params = {'batch_size': 2,

@@ -12,41 +12,12 @@ from copy import deepcopy
 from keras.models import Sequential
 import tensorflow as tf
 from tensorflow.keras import backend as K
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 
 from sklearn.preprocessing import LabelBinarizer
 from constants import * 
 # tf.config.run_functions_eagerly(True)
 mean_loss = tf.keras.metrics.Mean(name='Loss_Mean')
 
-
-
-earlystopper = EarlyStopping(patience=params['patience'], verbose=1),
-checkpoint = ModelCheckpoint(filepath=params['name_modelo'] + f'{specific_time} modelo retinopatia.h5',
-                             save_best_only=params['save_best_only'], verbose=1)
-
-def get_recall(y_true, y_pred):
-    TP = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-    Positives = K.sum(K.round(K.clip(y_true, 0, 1)))
-
-    recall = TP / (Positives + K.epsilon())
-    return recall
-
-
-def get_precision(y_true, y_pred):
-    TP = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-    Pred_Positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
-
-    precision = TP / (Pred_Positives + K.epsilon())
-    return precision
-
-
-def get_f1_score(y_true, y_pred):
-    precision, recall = get_precision(y_true, y_pred), get_recall(y_true, y_pred)
-
-    return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
-
-callbacks = [earlystopper, checkpoint]
 
 def print_status_bar(iteration, total, loss, metrics=None, bar_size=45):
     '''This function prints out the loss + other metrics (if specified) one below another.
@@ -324,7 +295,7 @@ class AdaBoostClassifier(object):
         weights = base_estimator0.get_weights()
         estimator.set_weights(weights) # Le atribuye al estimator los pesos de inicialización por defoult o los pesos del modelo anterior
         estimator.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True), optimizer=tf.keras.optimizers.Adam(params['lr']), 
-                          metrics=tf.keras.metrics.BinaryAccuracy(threshold=0.5)) #AGREGARLO
+                          metrics=tf.keras.metrics.BinaryAccuracy(threshold=0.5)) 
 
         return estimator 
 
